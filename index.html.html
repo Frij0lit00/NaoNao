@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>💙Para mi novia</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body{
+      display:grid;
+      place-items:center;
+      background: radial-gradient(1200px 700px at 50% 20%, #0f4b6a 0%, #0b2f4b 35%, #061023 100%);
+      overflow:hidden;
+      font-family: system-ui, Arial;
+    }
+    canvas{
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-radius: 18px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.45);
+      background: transparent;
+    }
+    .hint{
+      position: fixed;
+      bottom: 14px;
+      color: rgba(255,255,255,.75);
+      font-size: 13px;
+      user-select:none;
+      text-shadow: 0 10px 22px rgba(0,0,0,.5);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="720" height="420"></canvas>
+  <div class="hint"><i>Un lirio para mi delirio</i></div>
+
+  <script>
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+
+    // --------- Ajustes "pixel art" ----------
+    const PX = 6;            // tamaño de cada "pixel" en pantalla
+    const W = 120;           // ancho en celdas
+    const H = 70;            // alto en celdas
+
+    // Reescalamos el canvas para que sea pixel-perfect
+    canvas.width  = W * PX;
+    canvas.height = H * PX;
+
+    function pset(x, y, color, a=1){
+      ctx.globalAlpha = a;
+      ctx.fillStyle = color;
+      ctx.fillRect(x*PX, y*PX, PX, PX);
+      ctx.globalAlpha = 1;
+    }
+
+    // --------- Fondo bonito pixelado ----------
+    function drawBackground(){
+      // gradiente suave "por bloques" para que combine con pixel art
+      for (let y=0; y<H; y++){
+        const t = y/(H-1);
+        // mezcla de colores (arriba más azul, abajo más oscuro)
+        const top = [10, 25, 55];
+        const bot = [3,  10, 22];
+        const r = Math.round(top[0]*(1-t) + bot[0]*t);
+        const g = Math.round(top[1]*(1-t) + bot[1]*t);
+        const b = Math.round(top[2]*(1-t) + bot[2]*t);
+        for (let x=0; x<W; x++){
+          pset(x,y, `rgb(${r},${g},${b})`);
+        }
+      }
+
+      // bokeh (círculos) pero en estilo pixel: puntos dispersos
+      function dotCloud(cx, cy, radius, color, alpha){
+        for(let i=0;i<120;i++){
+          const ang = Math.random()*Math.PI*2;
+          const rr = Math.random()*radius;
+          const x = Math.round(cx + Math.cos(ang)*rr);
+          const y = Math.round(cy + Math.sin(ang)*rr);
+          if(x>=0 && x<W && y>=0 && y<H) pset(x,y,color,alpha);
+        }
+      }
+      dotCloud(18, 12, 10, "white", 0.08);
+      dotCloud(92, 18, 14, "white", 0.06);
+      dotCloud(70, 52, 18, "white", 0.05);
+      dotCloud(108, 10, 10, "white", 0.06);
+
+      // neblina abajo
+      for(let y=55; y<H; y++){
+        const a = (y-55)/(H-55) * 0.12;
+        for(let x=0;x<W;x++){
+          pset(x,y,"white", a);
+        }
+      }
+    }
+
+    // --------- Construimos el lirio pixel-por-pixel ----------
+    // En lugar de dibujar todo de golpe, generamos una lista de píxeles (x,y,color,alpha)
+    const pixels = [];
+
+    function addPixel(x,y,color,a=1){
+      pixels.push({x,y,color,a, key: Math.random()}); // key para "shuffle" leve
+    }
+
+    function addLine(x0,y0,x1,y1,color,a=1){
+      // Bresenham simple
+      let dx = Math.abs(x1-x0), sx = x0<x1 ? 1 : -1;
+      let dy = -Math.abs(y1-y0), sy = y0<y1 ? 1 : -1;
+      let err = dx+dy;
+      while(true){
+        addPixel(x0,y0,color,a);
+        if(x0===x1 && y0===y1) break;
+        const e2 = 2*err;
+        if(e2>=dy){ err += dy; x0 += sx; }
+        if(e2<=dx){ err += dx; y0 += sy; }
+      }
+    }
+
+    function addFilledCircle(cx,cy,r,color,a=1){
+      for(let y=-r;y<=r;y++){
+        for(let x=-r;x<=r;x++){
+          if(x*x+y*y <= r*r) addPixel(cx+x, cy+y, color, a);
+        }
+      }
+    }
+
+    // Pétalo pixel-art con forma "gota"
+    function addPetal(cx, cy, w, h, colorMain, colorShade){
+      for(let y=0; y<h; y++){
+        const t = y/(h-1);
+        const half = Math.round((w/2) * Math.sin(Math.PI*t) ** 0.95);
+        const yy = cy - y;
+
+        for(let x=-half; x<=half; x++){
+          const xx = cx + x;
+          // borde suave con sombreado
+          const edge = (Math.abs(x) === half);
+          const shade = (x > 0 && t>0.25); // sombra en lado derecho
+          addPixel(xx, yy, edge ? colorShade : (shade ? colorShade : colorMain), 1);
+        }
+      }
+      // punta arriba
+      addPixel(cx, cy-h, colorMain, 1);
+    }
+
+    function buildLily(){
+      // Posición base del lirio
+      const baseX = 60;
+      const baseY = 64;
+
+      // Tallo (verde con luz)
+      const stem = "#1f9b6f";
+      const stemDark = "#0f6b53";
+      addLine(baseX, baseY, baseX-2, 36, stemDark);
+      addLine(baseX+1, baseY, baseX-1, 36, stem);
+      addLine(baseX+2, baseY, baseX, 36, stem);
+
+      // Hojas (dos)
+      const leaf = "#2fbf8a";
+      const leafShade = "#198a64";
+
+      // Hoja izquierda
+      for(let i=0;i<18;i++){
+        addPixel(baseX-1-i, 52-i/2|0, leafShade, 1);
+        addPixel(baseX-2-i, 53-i/2|0, leaf, 1);
+      }
+      // Hoja derecha
+      for(let i=0;i<20;i++){
+        addPixel(baseX+2+i, 50-i/3|0, leafShade, 1);
+        addPixel(baseX+1+i, 51-i/3|0, leaf, 1);
+      }
+
+      // Flor (6 pétalos, 3 atrás + 3 delante)
+      const centerX = baseX;
+      const centerY = 34;
+
+      // Pétalos traseros
+      addPetal(centerX-10, centerY+8, 18, 18, "#cdb9ff", "#8f6dd3");
+      addPetal(centerX+10, centerY+8, 18, 18, "#cdb9ff", "#8f6dd3");
+      addPetal(centerX,    centerY+12, 20, 20, "#cdb9ff", "#8f6dd3");
+
+      // Pétalos delanteros (más claros y más grandes)
+      addPetal(centerX-8, centerY+4, 22, 22, "#f6f0ff", "#b79ae8");
+      addPetal(centerX+8, centerY+4, 22, 22, "#f6f0ff", "#b79ae8");
+      addPetal(centerX,   centerY+2, 24, 24, "#f6f0ff", "#b79ae8");
+
+      // Centro
+      addFilledCircle(centerX, centerY+6, 4, "#ffd166", 1);
+
+      // Estambres
+      const st = "#ffb703";
+      addLine(centerX, centerY+5, centerX-6, centerY-4, st);
+      addLine(centerX, centerY+5, centerX,   centerY-6, st);
+      addLine(centerX, centerY+5, centerX+6, centerY-4, st);
+      addFilledCircle(centerX-6, centerY-4, 1, "#fff3b0", 1);
+      addFilledCircle(centerX,   centerY-6, 1, "#fff3b0", 1);
+      addFilledCircle(centerX+6, centerY-4, 1, "#fff3b0", 1);
+    }
+
+    // --------- Animación: dibujar pixel por pixel ----------
+    drawBackground();
+    buildLily();
+
+    // Orden de pintado: de abajo hacia arriba (se ve como "crece") + un poco aleatorio
+    pixels.sort((a,b) => (a.y - b.y) || (a.key - b.key));
+
+    let i = 0;
+
+    // Velocidad estable (intermedia) independiente de FPS
+    const PIXELS_PER_SECOND = 3800; // Ajusta: 3200 (más lento) a 4500 (más rápido)
+    let lastTime = 0;
+
+    function animate(timestamp){
+      if (!lastTime) lastTime = timestamp;
+      const dt = (timestamp - lastTime) / 1000; // segundos
+      lastTime = timestamp;
+
+      const step = Math.max(1, Math.floor(PIXELS_PER_SECOND * dt));
+
+      for(let k=0; k<step && i<pixels.length; k++, i++){
+        const px = pixels[i];
+        if(px.x>=0 && px.x<W && px.y>=0 && px.y<H) pset(px.x, px.y, px.color, px.a);
+      }
+
+      if(i < pixels.length) requestAnimationFrame(animate);
+    }
+
+    // arranca al abrir
+    requestAnimationFrame(animate);
+
+    // Repetir animación al hacer click (opcional)
+    canvas.addEventListener("click", () => {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      drawBackground();
+      i = 0;
+      lastTime = 0;
+      requestAnimationFrame(animate);
+    });
+  </script>
+</body>
+</html>
